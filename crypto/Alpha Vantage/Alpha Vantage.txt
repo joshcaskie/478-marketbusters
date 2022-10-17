@@ -1,0 +1,12 @@
+FGQL9NDYEYP3223B
+
+
+Welcome to Alpha Vantage! Here is your API key: FGQL9NDYEYP3223B. Please record this API key at a safe place for future data access.
+
+
+Bitcoin:
+
+https://www.alphavantage.co/query?function=DIGITAL_CURRENCY_DAILY&symbol=BTC&market=USD&apikey=FGQL9NDYEYP3223B&datatype=csv
+
+
+
