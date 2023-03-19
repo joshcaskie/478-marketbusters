@@ -22,8 +22,9 @@ Here are some aspects I hope to analyze in the future:
   - **Adjusted and changed the algorithm. This inherently changes the results achieved from the original Fall 2022 testing, powerpoint, and report. Calling the new version v2.**
 - [ ] Apply an SMA indicator to help determine which *way* assets are moving. Divergence could mean one asset moves *differently* - the *direction* is NOT known! Perhaps knowing direction could help determine a better algorithm for acting on CORRMA decisions. 
 - [ ] Take some time to apply the CORRMA algorithm to specific stocks & sectors for more insight. Why does the algorithm seem to work so well on crypto but not other assets?
-  - [ ] Discussion with Prof. Liu during the semester yielded two thoughts:
-    - [ ] 1. "It simply could be random. These things happen and we don't know how it works. More investigation might be needed".
-    - [ ] 2. "It might "seem" random to us, but behind the scenes, there may be larger forces at play that lead to this "discovery". We don't know how these assets change value or get traded. There could be some hidden knowledge that we don't know (and may never know) that puts us at a disadvantage."
+  -  Discussion with Prof. Liu during the semester yielded two thoughts:
+       1. "It simply could be random. These things happen and we don't know how it works. More investigation might be needed".
+       2. "It might "seem" random to us, but behind the scenes, there may be larger forces at play that lead to this "discovery". We don't know how these assets change value or get traded. There could be some hidden knowledge that we don't know (and may never know) that puts us at a disadvantage."
+  - **AAPL vs QQQ**, buy & hold of AAPL from 12/31/2010 is better than using the algorithm (either case)
 - [ ] Reorganize the Repo. Remove unnecessary files. 
 - [ ] Change repo name & adjust report links accordingly. 
