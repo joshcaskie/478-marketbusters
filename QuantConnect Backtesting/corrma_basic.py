@@ -3,7 +3,6 @@ from AlgorithmImports import *
 from QuantConnect.DataSource import *
 from QuantConnect.Data.UniverseSelection import *
 # endregion
-# from datetime import datetime, timedelta
 import datetime
 
 from indicator import CustomCorrelationMovingAverage
@@ -44,7 +43,7 @@ class CorrmaAlgo(QCAlgorithm):
         # END_DATE = datetime.now() - datetime.timedelta(7)    # 7 days before today
 
         # Local log variable to limit the number of messages (QuantConnect has a limit)
-        self.loglimit = 30
+        self.loglimit = 0
 
 
         # Initialization
@@ -64,8 +63,8 @@ class CorrmaAlgo(QCAlgorithm):
                          self.TimeRules.At(12, 0),
                          lambda: self.Liquidate())
 
-        # Set the warm up period (not using - algo warms up locally).
-        # self.SetWarmup(timedelta(self.window))
+        # Set the warm up period
+        self.SetWarmup(datetime.timedelta(self.window))
 
         # Bitfinex accepts both Cash and Margin type account.
         # https://www.quantconnect.com/data/file/crypto/bitfinex/daily/btcusd_quote.zip/btcusd.csv
@@ -112,7 +111,7 @@ class CorrmaAlgo(QCAlgorithm):
 
         
         # Use the indicator to make trading decisions (only trade if indicator is ready AND it's not the last day of the algorithm - edge case for scheduling the Liquidate())
-        if self.corrma.IsReady and self.EndDate - self.Time > timedelta(1):
+        if not self.IsWarmingUp and self.corrma.IsReady and self.EndDate - self.Time > datetime.timedelta(1):
             # Initially purchase the independent symbol
             if not self.Portfolio.Invested:
                 self.SetHoldings(self.ind_symbol, 1)
