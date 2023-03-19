@@ -3,30 +3,68 @@ from AlgorithmImports import *
 from QuantConnect.DataSource import *
 from QuantConnect.Data.UniverseSelection import *
 # endregion
-from datetime import datetime, timedelta
-from collections import deque
+# from datetime import datetime, timedelta
+import datetime
+
+from indicator import CustomCorrelationMovingAverage
 
 class CorrmaAlgo(QCAlgorithm):
 
     def Initialize(self):
         '''
-        window = # of days to set as the correlation moving average
-        corrma = correlation threshold to check for on the moving average and trigger a trade. 
-        '''
-        self.window = 30
-        self.corrma_ratio = 0.0
+        QC_OPTIMIZING = False when running individual tests. True when using QC Optimization testing.
 
-        self.SetCash(100000)  
-        self.SetStartDate(2018, 1, 1)
-        self.SetEndDate(2022, 11, 22)
-        # self.SetEndDate(datetime.now() - timedelta(7))
+        CRYPTO = True if using crypto assets, False otherwise (for stocks/ETFs, etc.)
+        IND_ASSET = Starting asset. Swap to DEP_ASSET when CORRMA < THRESHOLD.
+        DEP_ASSET = Swapped asset.
+
+        WINDOW = # of days to set as the correlation moving average
+        THRESHOLD = correlation threshold to check for on the moving average and trigger a trade.
+        CASH = starting cash value (USD)
+        START_DATE
+        END_DATE 
+        self.loglimit = # of logs to display before stopping to save $.
+
+        Current testing indicates that if the IND_ASSET is the "more volatile" asset, and the DEP_ASSET is the "larger cap/less volatile" asset, this generates better returns (crypto).
+        '''
+        # QuantConnect Optimization
+        QC_OPTIMIZING = False
+
+        # Set Assets
+        CRYPTO = True
+        IND_ASSET = "ETHUSD"        # "AMZN"
+        DEP_ASSET = "BTCUSD"        # "XLY"
+
+        # Set Values
+        WINDOW = 90
+        THRESHOLD = 0.3
+        CASH = 100000
+        START_DATE = datetime.date(2017, 1, 1)      # Year, Month, Day
+        END_DATE = datetime.date(2022, 11, 22)
+        # END_DATE = datetime.now() - datetime.timedelta(7)    # 7 days before today
+
+        # Local log variable to limit the number of messages (QuantConnect has a limit)
+        self.loglimit = 30
+
+
+        # Initialization
+        if not QC_OPTIMIZING:
+            self.window = WINDOW
+            self.corrma_ratio = THRESHOLD
+        else:
+            self.window = int(self.GetParameter("window"))
+            self.corrma_ratio = float(self.GetParameter("threshold"))
+
+        self.SetCash(CASH)  
+        self.SetStartDate(START_DATE)
+        self.SetEndDate(END_DATE)
 
         # Set Account to Liquidate at the End Date (end on EndDate, and at 12pm that day). 
         self.Schedule.On(self.DateRules.On(self.EndDate.year, self.EndDate.month, self.EndDate.day),  
                          self.TimeRules.At(12, 0),
                          lambda: self.Liquidate())
 
-        # Set the warm up period
+        # Set the warm up period (not using - algo warms up locally).
         # self.SetWarmup(timedelta(self.window))
 
         # Bitfinex accepts both Cash and Margin type account.
@@ -35,36 +73,33 @@ class CorrmaAlgo(QCAlgorithm):
         # self.AddUniverse(CryptoCoarseFundamentalUniverse(Market.Bitfinex, self.UniverseSettings, self.UniverseSelectionFilter))
 
         # For Crypto Only
-        self.SetBrokerageModel(BrokerageName.Bitfinex, AccountType.Cash)
-        self.SetBrokerageModel(BrokerageName.Bitfinex, AccountType.Margin)
+        # self.SetBrokerageModel(BrokerageName.Bitfinex, AccountType.Cash)
+        # self.SetBrokerageModel(BrokerageName.Bitfinex, AccountType.Margin)
 
         # Set the assets
-        self.ind_symbol = self.AddCrypto("BTCUSD", Resolution.Daily, Market.Bitfinex).Symbol
-        self.dep_symbol = self.AddCrypto("ETHUSD", Resolution.Daily, Market.Bitfinex).Symbol
+        if CRYPTO:
+            self.ind_symbol = self.AddCrypto(IND_ASSET, Resolution.Daily, Market.Bitfinex).Symbol
+            self.dep_symbol = self.AddCrypto(DEP_ASSET, Resolution.Daily, Market.Bitfinex).Symbol
+        else:
+            self.ind_symbol = self.AddEquity(IND_ASSET, Resolution.Daily).Symbol
+            self.dep_symbol = self.AddEquity(DEP_ASSET, Resolution.Daily).Symbol
             
         # Custom CORMRMA Indicator
         self.corrma = CustomCorrelationMovingAverage("CORRMA", self.window)
         self.corrma_triggered = False
-
-        self.loglimit = 35
 
 
     def OnData(self, data: Slice):
 
         # Check Logs (only put logs here to limit the # of logs you use per test)
         if self.loglimit != 0:
-            # self.Log(self.corrma.__repr__())
+            self.Log(self.corrma.__repr__())
             # self.Log(self.EndDate - self.Time)
             self.loglimit -= 1
 
         # NOTE - Crypto trading in Quant Connect needs different methods compared to traditional assets and securities
         # https://www.quantconnect.com/docs/v2/writing-algorithms/trading-and-orders/crypto-trades
         # However, I'm just not going to worry about this for now and just trade with the asset pairs! :D
-
-        # Initially purchase the independent symbol
-        if not self.Portfolio.Invested:
-            self.SetHoldings(self.ind_symbol, 1)
-            
 
         # Update the indicator manually
         if data.ContainsKey(self.ind_symbol): 
@@ -78,6 +113,10 @@ class CorrmaAlgo(QCAlgorithm):
         
         # Use the indicator to make trading decisions (only trade if indicator is ready AND it's not the last day of the algorithm - edge case for scheduling the Liquidate())
         if self.corrma.IsReady and self.EndDate - self.Time > timedelta(1):
+            # Initially purchase the independent symbol
+            if not self.Portfolio.Invested:
+                self.SetHoldings(self.ind_symbol, 1)
+
             value = self.corrma.Value
 
             if value <= self.corrma_ratio and not self.corrma_triggered:
@@ -88,43 +127,6 @@ class CorrmaAlgo(QCAlgorithm):
 
             if value > self.corrma_ratio and self.corrma_triggered:
                 self.corrma_triggered = False
-                # Swap back to the original assset
+                # Swap back to the original asset
                 self.Liquidate(self.dep_symbol)
                 self.SetHoldings(self.ind_symbol, 1)
-
-
-# Custom Corrma Indicator
-class CustomCorrelationMovingAverage(PythonIndicator):
-    import pandas as pd
-
-    def __init__(self, name, period):
-        self.Name = name 
-        # self.WarmUpPeriod = period * 2             # How long to initialize
-        # This WarmUpPeriod pumps in data from BEFORE the start of the algorithm... Am I worried about that?
-        self.Time = datetime.min                # Initial value
-        self.Value = 0.0                        # Initial value
-        self.ind_queue = deque(maxlen=period)   # I think this sets the max # of data rows the indicator can store
-        self.dep_queue = deque(maxlen=period)
-
-        self.myupdate = False
-
-    def __repr__(self):
-        return f"{self.Name} -> IsReady: {self.IsReady}. Time: {self.Time}. Value: {self.Value}. Ind Queue (Len vs. Max): ({len(self.ind_queue)}, {self.ind_queue.maxlen}). Dep Queue (Len vs. Max): ({len(self.dep_queue)}, {self.dep_queue.maxlen})"
-
-    @property
-    def IsReady(self) -> bool:
-        return len(self.ind_queue) == self.ind_queue.maxlen and len(self.dep_queue) == self.dep_queue.maxlen
-
-    def Update(self, input: BaseData, ind_bar: bool) -> bool:
-        if ind_bar:
-            self.ind_queue.append(input.Value)
-        else:
-            self.dep_queue.append(input.Value)
-
-        self.Time = input.Time 
-
-        if self.IsReady:
-            self.Value = pd.DataFrame({'col1': self.ind_queue, 'col2': self.dep_queue}).corr().iloc[0].iloc[1]
-
-        # Supposed to "Show when indicator IsReady", but I think it's broken.
-        return len(self.ind_queue) == self.ind_queue.maxlen and len(self.dep_queue) == self.dep_queue.maxlen
